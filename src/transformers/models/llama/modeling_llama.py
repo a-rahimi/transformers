@@ -306,7 +306,13 @@ class LlamaMLP(nn.Module):
             ]
             down_proj = sum(down_proj)
         else:
-            down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+            mlp1 = self.act_fn(self.gate_proj(x)) * self.up_proj(x)
+            down_proj = self.down_proj(mlp1)
+            mlp2 = down_proj
+
+            if not hasattr(self, "mlp1"):
+                self.mlp1 = mlp1
+                self.mlp2 = mlp2
 
         return down_proj
 
@@ -736,12 +742,16 @@ class LlamaDecoderLayer(nn.Module):
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_value=past_key_value,
-            output_attentions=output_attentions,
+            output_attentions=True,
             use_cache=use_cache,
             cache_position=cache_position,
             position_embeddings=position_embeddings,
             **kwargs,
         )
+        if not hasattr(self, "attn_output"):
+            self.attn_output = hidden_states
+            self.attn_weights = self_attn_weights
+
         hidden_states = residual + hidden_states
 
         # Fully Connected
