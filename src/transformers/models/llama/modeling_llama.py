@@ -307,6 +307,12 @@ class LlamaMLP(nn.Module):
             down_proj = sum(down_proj)
         else:
             mlp1 = self.act_fn(self.gate_proj(x)) * self.up_proj(x)
+
+            if getattr(self.config, "nuke_small_mlp1_activations") is not None:
+                inuke = mlp1.abs() < mlp1.abs().mean() * self.config.nuke_small_mlp1_activations
+                print("Nuking %g of the MLP1 activations" % inuke.to(float).mean())
+                mlp1[inuke] = 0
+
             down_proj = self.down_proj(mlp1)
             mlp2 = down_proj
 
@@ -435,6 +441,12 @@ class LlamaAttention(nn.Module):
 
         # upcast attention to fp32
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+
+        if getattr(self.config, "nuke_small_attn_weights") is not None:
+            inuke = attn_weights < attn_weights.mean() * self.config.nuke_small_attn_weights
+            print("Nuking %g of the attention weights" % inuke.to(float).mean())
+            attn_weights[inuke] = 0
+
         attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
         attn_output = torch.matmul(attn_weights, value_states)
 
